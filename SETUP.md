@@ -33,6 +33,9 @@ This installs system + Python dependencies, prompts for your Roboflow API
 key (saved to `.env`), captures a photo from a Pi Camera or USB webcam, and
 runs detection on it. Re-run it any time to capture and detect again.
 
+For continuous live detection instead of a single photo, see
+[Live detection](#live-detection) below.
+
 ## 3. Install system dependencies
 
 ```bash
@@ -56,6 +59,10 @@ python3 -m venv .venv
 .venv/bin/pip install --upgrade pip
 .venv/bin/pip install -r requirements.txt
 ```
+
+`opencv-python` (needed for live detection) is a larger package — on a Pi 3B
+this install can take several minutes even with prebuilt [piwheels](https://www.piwheels.org/)
+wheels, which Raspberry Pi OS's pip is preconfigured to use.
 
 ## 6. Set your Roboflow API key
 
@@ -112,6 +119,44 @@ libcamera-still -o capture.jpg -n
 Ask if you'd like this turned into an actual scheduled/looping script with
 alerting (e.g. trigger a deterrent, send a notification) when a goose is
 detected.
+
+## Live detection
+
+Instead of capturing one photo at a time, `live_detect.py` keeps the camera
+feed running and periodically sends the latest frame to Roboflow (every 1
+second by default — this interval is deliberately throttled so a continuous
+video feed doesn't hammer the cloud API), drawing the most recent detection
+boxes on every displayed frame.
+
+```bash
+./run.sh live            # opens a local window (needs a monitor + desktop)
+./run.sh live --stream   # serves the feed over HTTP instead (headless-friendly)
+```
+
+Since a Pi 3B running Raspberry Pi OS **Lite** has no desktop/display server,
+use `--stream` on a headless Pi: it starts a small web server and prints a
+URL like `http://<pi-ip>:8000/` — open that in a browser on any device on
+the same network to watch the live annotated feed.
+
+Useful flags (pass after `live`, e.g. `./run.sh live --stream --interval 2`):
+- `--interval SECONDS` — how often to call the cloud API (default `1.0`).
+  Lower = more responsive detection but more API calls; raise this if you hit
+  rate limits or want to reduce data usage.
+- `--camera INDEX` — camera device index if you have more than one (default `0`).
+- `--port PORT` — port for `--stream` mode (default `8000`).
+
+You can also run it directly without `run.sh`:
+
+```bash
+.venv/bin/python live_detect.py --stream
+```
+
+**Camera compatibility note:** `live_detect.py` captures frames via OpenCV,
+which works out of the box with USB webcams (`/dev/video0`). The Pi Camera
+Module is not guaranteed to show up as a V4L2 device under the modern
+`libcamera` stack on Raspberry Pi OS Bookworm — if `--camera 0` fails to
+open, either enable the legacy camera stack in `raspi-config`, or use a USB
+webcam instead.
 
 ## Notes
 

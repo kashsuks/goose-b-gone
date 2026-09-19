@@ -2,25 +2,45 @@
 # Sets up and runs the Canadian geese detector. Primarily intended for a
 # Raspberry Pi (or any Debian-based Linux box with a camera), but also
 # supports macOS for local testing. Installs dependencies, prompts for your
-# Roboflow API key, captures a photo, and runs detection on it.
+# Roboflow API key, then either detects on a single captured photo or runs
+# live detection on the camera feed.
+#
+# Usage:
+#   ./run.sh                 detect on a single captured photo (default)
+#   ./run.sh live             live detection in a local window
+#   ./run.sh live --stream    live detection served as an MJPEG stream over
+#                              HTTP (use this on a headless machine, e.g. a
+#                              Raspberry Pi with no monitor attached)
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
+MODE="${1:-static}"
+if [ "$MODE" = "live" ]; then
+    shift
+fi
+
 OS="$(uname -s)"
-echo "== goose-b-gone setup ($OS) =="
+echo "== goose-b-gone setup ($OS, mode: $MODE) =="
 
 # 1. System dependencies
 if [ "$OS" = "Darwin" ]; then
-    if ! command -v brew >/dev/null 2>&1; then
-        echo "Homebrew not found. Install it from https://brew.sh, or install imagesnap manually for camera capture." >&2
-    elif ! command -v imagesnap >/dev/null 2>&1; then
-        echo "Installing imagesnap (webcam capture tool) via Homebrew..."
-        brew install imagesnap
+    if [ "$MODE" = "static" ]; then
+        if ! command -v brew >/dev/null 2>&1; then
+            echo "Homebrew not found. Install it from https://brew.sh, or install imagesnap manually for camera capture." >&2
+        elif ! command -v imagesnap >/dev/null 2>&1; then
+            echo "Installing imagesnap (webcam capture tool) via Homebrew..."
+            brew install imagesnap
+        fi
     fi
 elif command -v apt-get >/dev/null 2>&1; then
     echo "Installing system dependencies (requires sudo)..."
     sudo apt-get update
-    sudo apt-get install -y python3-venv python3-pip
+    # libgl1/libglib2.0-0 are needed for opencv-python (used by live mode) to
+    # import correctly, even on a headless Pi.
+    sudo apt-get install -y python3-venv python3-pip libgl1 libglib2.0-0
+    if [ "$MODE" = "static" ]; then
+        sudo apt-get install -y fswebcam
+    fi
 else
     echo "No known package manager found, skipping system package install (assuming dependencies are already present)."
 fi
@@ -81,6 +101,13 @@ fi
 set -a
 source .env
 set +a
+
+if [ "$MODE" = "live" ]; then
+    # live_detect.py opens the camera itself (via OpenCV), so no separate
+    # capture tool is needed here. Extra args (e.g. --stream) are forwarded.
+    echo "Starting live detection..."
+    exec .venv/bin/python live_detect.py "$@"
+fi
 
 # 4. Capture a photo
 CAPTURE_FILE="capture.jpg"
