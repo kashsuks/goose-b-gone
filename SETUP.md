@@ -85,9 +85,11 @@ Or export it once for the pi user by adding the line to `~/.bashrc`.
 ## 7. Set up a camera
 
 - **Pi Camera Module**: enable it via `sudo raspi-config` → Interface Options
-  → Camera, then reboot. Capture a still with:
+  → Camera, then reboot. Capture a still with (`sudo apt install rpicam-apps`
+  if not already present — on current Raspberry Pi OS, `rpicam-still` is the
+  successor to the older `libcamera-still` command):
   ```bash
-  libcamera-still -o capture.jpg
+  rpicam-still -o capture.jpg
   ```
 - **USB webcam**: capture a still with `fswebcam` (`sudo apt install fswebcam`):
   ```bash
@@ -112,7 +114,7 @@ run periodically, e.g. every 30 seconds:
 #!/bin/bash
 cd /home/pi/goose-b-gone
 set -a; source .env; set +a
-libcamera-still -o capture.jpg -n
+rpicam-still -o capture.jpg -n
 .venv/bin/python detect.py capture.jpg
 ```
 
@@ -151,12 +153,21 @@ You can also run it directly without `run.sh`:
 .venv/bin/python live_detect.py --stream
 ```
 
-**Camera compatibility note:** `live_detect.py` captures frames via OpenCV,
-which works out of the box with USB webcams (`/dev/video0`). The Pi Camera
-Module is not guaranteed to show up as a V4L2 device under the modern
-`libcamera` stack on Raspberry Pi OS Bookworm — if `--camera 0` fails to
-open, either enable the legacy camera stack in `raspi-config`, or use a USB
-webcam instead.
+**Camera backends:** `live_detect.py` supports two capture backends via
+`--backend`:
+- `opencv` (default fallback) — OpenCV's `VideoCapture`, for USB/UVC webcams
+  and macOS's built-in camera. Real-time frame rate.
+- `rpicam` — shells out to `rpicam-still` per frame, for the Pi Camera
+  Module, which the modern `libcamera` stack doesn't expose as a plain V4L2
+  device that OpenCV can open directly. Each capture takes roughly a second
+  due to libcamera pipeline startup, so this behaves like a periodically
+  refreshed snapshot rather than smooth video — that's still fine here since
+  cloud detection is already throttled to about once per second.
+
+`--backend auto` (the default) picks `rpicam` if `rpicam-still` is found on
+the system, otherwise `opencv`. Override with `--backend opencv` or
+`--backend rpicam` if the auto-detection guesses wrong (e.g. you have both a
+Pi Camera and a USB webcam attached).
 
 ## Notes
 

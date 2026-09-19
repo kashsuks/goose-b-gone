@@ -38,11 +38,12 @@ elif command -v apt-get >/dev/null 2>&1; then
     # libgl1/libglib2.0-0 are needed for opencv-python (used by live mode) to
     # import correctly, even on a headless Pi.
     sudo apt-get install -y python3-venv python3-pip libgl1 libglib2.0-0
+    # rpicam-apps (Pi Camera Module support, used by both static and live
+    # modes) is Raspberry Pi OS-specific and may not exist on other Debian
+    # systems, so don't hard-fail.
+    sudo apt-get install -y rpicam-apps || true
     if [ "$MODE" = "static" ]; then
         sudo apt-get install -y fswebcam
-        # rpicam-apps (Pi Camera Module support) is Raspberry Pi OS-specific
-        # and may not exist on other Debian systems, so don't hard-fail.
-        sudo apt-get install -y rpicam-apps || true
     fi
 else
     echo "No known package manager found, skipping system package install (assuming dependencies are already present)."

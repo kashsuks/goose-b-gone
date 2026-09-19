@@ -1,4 +1,7 @@
 import argparse
+import shutil
+import subprocess
+import tempfile
 import threading
 import time
 
@@ -10,17 +13,77 @@ BOX_COLOR = (0, 0, 255)  # red, BGR
 TEXT_COLOR = (255, 255, 255)
 
 
+class OpenCVCapture:
+    """Captures frames via OpenCV's VideoCapture (works with USB/UVC webcams,
+    including on macOS)."""
+
+    def __init__(self, camera_index: int):
+        self._cap = cv2.VideoCapture(camera_index)
+        if not self._cap.isOpened():
+            raise RuntimeError(f"Could not open camera index {camera_index}")
+
+    def read(self):
+        return self._cap.read()
+
+    def release(self) -> None:
+        self._cap.release()
+
+
+class RpicamCapture:
+    """Captures frames by shelling out to rpicam-still. Needed for Raspberry
+    Pi Camera Module sensors managed by libcamera, which OpenCV's V4L2
+    backend cannot open directly. Each call blocks for roughly a second due
+    to libcamera pipeline startup, so this behaves like a periodically
+    refreshed snapshot rather than a smooth video feed."""
+
+    def __init__(self):
+        if shutil.which("rpicam-still") is None:
+            raise RuntimeError("rpicam-still not found on PATH")
+
+    def read(self):
+        with tempfile.NamedTemporaryFile(suffix=".jpg") as tmp:
+            proc = subprocess.run(
+                [
+                    "rpicam-still",
+                    "-n",
+                    "--timeout",
+                    "1",
+                    "--width",
+                    "1280",
+                    "--height",
+                    "720",
+                    "-o",
+                    tmp.name,
+                ],
+                capture_output=True,
+            )
+            if proc.returncode != 0:
+                return False, None
+            frame = cv2.imread(tmp.name)
+            return frame is not None, frame
+
+    def release(self) -> None:
+        pass
+
+
+def open_capture(camera_index: int, backend: str):
+    if backend == "auto":
+        backend = "rpicam" if shutil.which("rpicam-still") else "opencv"
+    if backend == "rpicam":
+        return RpicamCapture()
+    return OpenCVCapture(camera_index)
+
+
 class LiveDetector:
     """Continuously grabs frames from a camera and periodically runs cloud
     detection on the latest frame in a background thread, so the video feed
-    stays smooth even though inference happens over the network."""
+    stays as smooth as the capture backend allows even though inference
+    happens over the network."""
 
-    def __init__(self, camera_index: int, interval: float):
+    def __init__(self, camera_index: int, interval: float, backend: str):
         self.client = get_client()
         self.interval = interval
-        self.capture = cv2.VideoCapture(camera_index)
-        if not self.capture.isOpened():
-            raise RuntimeError(f"Could not open camera index {camera_index}")
+        self.capture = open_capture(camera_index, backend)
 
         self._frame_lock = threading.Lock()
         self._latest_frame = None
@@ -143,6 +206,13 @@ def main() -> None:
         help="Seconds between cloud detection calls (default: 1.0)",
     )
     parser.add_argument(
+        "--backend",
+        choices=["auto", "opencv", "rpicam"],
+        default="auto",
+        help="Camera capture backend. 'auto' uses rpicam-still if available "
+        "(Raspberry Pi Camera Module), otherwise OpenCV (USB webcams, macOS).",
+    )
+    parser.add_argument(
         "--stream",
         action="store_true",
         help="Serve an MJPEG stream over HTTP instead of opening a local window "
@@ -152,7 +222,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8000, help="Port to bind for --stream")
     args = parser.parse_args()
 
-    detector = LiveDetector(camera_index=args.camera, interval=args.interval)
+    detector = LiveDetector(camera_index=args.camera, interval=args.interval, backend=args.backend)
     detector.start()
     try:
         if args.stream:
