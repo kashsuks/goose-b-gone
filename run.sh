@@ -48,7 +48,7 @@ fi
 # 2. Python virtual environment
 # inference-sdk currently requires Python < 3.13, so prefer a compatible
 # interpreter over whatever "python3" happens to resolve to (e.g. Homebrew's
-# python3 on macOS is often newer than that).
+# python3 on macOS, or Raspberry Pi OS trixie's python3, are 3.13+).
 PYTHON_BIN=""
 for candidate in python3.12 python3.11 python3.10 python3; do
     if command -v "$candidate" >/dev/null 2>&1; then
@@ -62,20 +62,39 @@ for candidate in python3.12 python3.11 python3.10 python3; do
     fi
 done
 
+USE_UV=""
 if [ -z "$PYTHON_BIN" ]; then
-    echo "Could not find a Python interpreter < 3.13 (required by inference-sdk)." >&2
-    echo "Install Python 3.10-3.12 (e.g. 'brew install python@3.12' on macOS) and re-run." >&2
-    exit 1
+    echo "No system Python < 3.13 found (required by inference-sdk)."
+    export PATH="$HOME/.local/bin:$PATH"
+    if ! command -v uv >/dev/null 2>&1; then
+        echo "Installing uv to fetch a compatible Python build (avoids a slow from-source compile on the Pi)..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+    if ! command -v uv >/dev/null 2>&1; then
+        echo "Failed to install uv. Install Python 3.10-3.12 manually and re-run." >&2
+        exit 1
+    fi
+    USE_UV=1
 fi
 
 if [ ! -d .venv ]; then
-    echo "Creating virtual environment with $PYTHON_BIN..."
-    "$PYTHON_BIN" -m venv .venv
+    if [ -n "$USE_UV" ]; then
+        echo "Creating virtual environment with uv (Python 3.12)..."
+        uv venv --python 3.12 .venv
+    else
+        echo "Creating virtual environment with $PYTHON_BIN..."
+        "$PYTHON_BIN" -m venv .venv
+    fi
 fi
 
 echo "Installing Python dependencies..."
-.venv/bin/pip install --upgrade pip -q
-.venv/bin/pip install -q -r requirements.txt
+if [ -n "$USE_UV" ]; then
+    uv pip install --python .venv/bin/python -q -r requirements.txt
+else
+    .venv/bin/pip install --upgrade pip -q
+    .venv/bin/pip install -q -r requirements.txt
+fi
 
 # 3. Roboflow API key
 if [ -f .env ] && grep -q '^ROBOFLOW_API_KEY=.\+' .env; then
