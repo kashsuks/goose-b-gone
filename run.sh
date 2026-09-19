@@ -40,6 +40,9 @@ elif command -v apt-get >/dev/null 2>&1; then
     sudo apt-get install -y python3-venv python3-pip libgl1 libglib2.0-0
     if [ "$MODE" = "static" ]; then
         sudo apt-get install -y fswebcam
+        # rpicam-apps (Pi Camera Module support) is Raspberry Pi OS-specific
+        # and may not exist on other Debian systems, so don't hard-fail.
+        sudo apt-get install -y rpicam-apps || true
     fi
 else
     echo "No known package manager found, skipping system package install (assuming dependencies are already present)."
@@ -130,7 +133,10 @@ fi
 
 # 4. Capture a photo
 CAPTURE_FILE="capture.jpg"
-if command -v libcamera-still >/dev/null 2>&1; then
+if command -v rpicam-still >/dev/null 2>&1; then
+    echo "Capturing photo with Pi Camera (rpicam-still)..."
+    rpicam-still -o "$CAPTURE_FILE" -n
+elif command -v libcamera-still >/dev/null 2>&1; then
     echo "Capturing photo with Pi Camera (libcamera-still)..."
     libcamera-still -o "$CAPTURE_FILE" -n
 elif command -v fswebcam >/dev/null 2>&1; then
@@ -140,11 +146,12 @@ elif command -v imagesnap >/dev/null 2>&1; then
     echo "Capturing photo with Mac webcam (imagesnap)..."
     imagesnap "$CAPTURE_FILE"
 else
-    echo "No camera tool found (libcamera-still, fswebcam, or imagesnap)." >&2
+    echo "No camera tool found (rpicam-still, libcamera-still, fswebcam, or imagesnap)." >&2
     if [ "$OS" = "Darwin" ]; then
         echo "Install one, e.g.: brew install imagesnap" >&2
     else
-        echo "Install one, e.g.: sudo apt-get install -y fswebcam" >&2
+        echo "For a Pi Camera Module: sudo apt-get install -y rpicam-apps" >&2
+        echo "For a USB webcam: sudo apt-get install -y fswebcam" >&2
     fi
     exit 1
 fi
