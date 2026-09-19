@@ -20,6 +20,19 @@ SSH so it boots ready to connect to.
 ssh pi@<pi-hostname-or-ip>
 ```
 
+## Quickstart
+
+Once you've cloned the repo onto the Pi (step 4 below), you can skip steps
+5-8 and just run:
+
+```bash
+./run.sh
+```
+
+This installs system + Python dependencies, prompts for your Roboflow API
+key (saved to `.env`), captures a photo from a Pi Camera or USB webcam, and
+runs detection on it. Re-run it any time to capture and detect again.
+
 ## 3. Install system dependencies
 
 ```bash
