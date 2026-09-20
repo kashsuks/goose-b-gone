@@ -32,7 +32,11 @@ def main() -> None:
         description="Receives drive commands over HTTP (from chase.py running "
         "on another machine) and forwards them to the Arduino over serial."
     )
-    parser.add_argument("--arduino-port", default="/dev/ttyUSB0", help="Arduino serial port")
+    parser.add_argument(
+        "--arduino-port",
+        default=None,
+        help="Arduino serial port (default: auto-detect via /dev/serial/by-id/)",
+    )
     parser.add_argument("--baud", type=int, default=9600)
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind the HTTP server on")
     parser.add_argument("--port", type=int, default=5005, help="Port to bind the HTTP server on")

@@ -1,11 +1,31 @@
+import glob
 import time
 
 import requests
 import serial
 
-DEFAULT_PORT = "/dev/ttyUSB0"
 DEFAULT_BAUD = 9600
 DEFAULT_RELAY_PORT = 5005
+
+
+def find_arduino_port() -> str:
+    """Finds the Arduino's serial device. Prefers /dev/serial/by-id/, which
+    stays stable across reconnects, since /dev/ttyUSB* numbering can shift
+    (e.g. ttyUSB0 -> ttyUSB1) on replug or a flaky USB/power connection."""
+    by_id = sorted(glob.glob("/dev/serial/by-id/*"))
+    if by_id:
+        return by_id[0]
+
+    candidates = sorted(glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*"))
+    if candidates:
+        return candidates[0]
+
+    raise RuntimeError(
+        "No Arduino serial device found (checked /dev/serial/by-id/, "
+        "/dev/ttyUSB*, /dev/ttyACM*). Is it plugged in? Run "
+        "`vcgencmd get_throttled` too — a non-zero result means the Pi's "
+        "power supply is dropping the USB connection."
+    )
 
 
 class CarController:
@@ -14,7 +34,9 @@ class CarController:
     0-255 speed, or S to stop. No backward command — there's no rear-facing
     camera to drive by."""
 
-    def __init__(self, port: str = DEFAULT_PORT, baud: int = DEFAULT_BAUD):
+    def __init__(self, port: str | None = None, baud: int = DEFAULT_BAUD):
+        port = port or find_arduino_port()
+        print(f"Connecting to Arduino on {port}...")
         self._serial = serial.Serial(port, baud, timeout=1)
         # The Arduino resets when the serial connection opens (DTR toggle);
         # give it time to finish booting before sending commands.

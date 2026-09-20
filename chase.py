@@ -25,7 +25,11 @@ def main() -> None:
         "search behavior, no backward movement (no rear-facing camera) — "
         "does nothing when no goose is in frame."
     )
-    parser.add_argument("--port", default="/dev/ttyUSB0", help="Arduino serial port (ignored if --relay-host is set)")
+    parser.add_argument(
+        "--port",
+        default=None,
+        help="Arduino serial port (default: auto-detect). Ignored if --relay-host is set.",
+    )
     parser.add_argument("--baud", type=int, default=9600)
     parser.add_argument(
         "--relay-host",
