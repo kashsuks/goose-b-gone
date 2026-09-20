@@ -5,10 +5,11 @@ from car_control import CarController
 from live_detect import LiveDetector
 
 
-def pick_target(predictions):
-    if not predictions:
+def pick_target(predictions, min_confidence):
+    candidates = [p for p in predictions if p["confidence"] >= min_confidence]
+    if not candidates:
         return None
-    return max(predictions, key=lambda p: p["width"] * p["height"])
+    return max(candidates, key=lambda p: p["width"] * p["height"])
 
 
 def compute_command(pred, frame_width, turn_threshold, close_threshold, speed):
@@ -62,6 +63,12 @@ def main() -> None:
         default=3.0,
         help="Seconds with no goose detected before the car starts scanning",
     )
+    parser.add_argument(
+        "--min-confidence",
+        type=float,
+        default=0.7,
+        help="Minimum detection confidence (0-1) for a box to be considered a goose",
+    )
     args = parser.parse_args()
 
     detector = LiveDetector(camera_index=args.camera, interval=args.interval, backend=args.backend)
@@ -78,7 +85,7 @@ def main() -> None:
                 continue
 
             frame_width = frame.shape[1]
-            target = pick_target(detector.get_predictions())
+            target = pick_target(detector.get_predictions(), args.min_confidence)
 
             if target is None:
                 if time.time() - last_seen >= args.search_after:
