@@ -2,3 +2,4 @@ inference-sdk
 opencv-python
 flask
 pyserial
+requests

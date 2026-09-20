@@ -1,9 +1,11 @@
 import time
 
+import requests
 import serial
 
 DEFAULT_PORT = "/dev/ttyUSB0"
 DEFAULT_BAUD = 9600
+DEFAULT_RELAY_PORT = 5005
 
 
 class CarController:
@@ -37,3 +39,39 @@ class CarController:
     def close(self) -> None:
         self.stop()
         self._serial.close()
+
+
+class RemoteCarController:
+    """Same interface as CarController, but sends commands over HTTP to a
+    motor_server.py running elsewhere (e.g. on the Pi) instead of talking to
+    a local serial port. Use this when detection runs on a different machine
+    than the one physically wired to the Arduino."""
+
+    def __init__(self, host: str, port: int = DEFAULT_RELAY_PORT):
+        self._base_url = f"http://{host}:{port}"
+
+    def forward(self, speed: int) -> None:
+        self._send("F", speed)
+
+    def left(self, speed: int) -> None:
+        self._send("L", speed)
+
+    def right(self, speed: int) -> None:
+        self._send("R", speed)
+
+    def stop(self) -> None:
+        self._send("S", 0)
+
+    def _send(self, direction: str, speed: int) -> None:
+        speed = max(0, min(255, int(speed)))
+        try:
+            requests.post(
+                f"{self._base_url}/drive",
+                json={"direction": direction, "speed": speed},
+                timeout=1,
+            )
+        except requests.RequestException as exc:
+            print(f"Relay error sending to {self._base_url}: {exc}")
+
+    def close(self) -> None:
+        self.stop()

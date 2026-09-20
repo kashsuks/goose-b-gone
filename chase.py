@@ -1,7 +1,7 @@
 import argparse
 import time
 
-from car_control import CarController
+from car_control import CarController, RemoteCarController
 from live_detect import LiveDetector
 
 
@@ -25,8 +25,17 @@ def main() -> None:
         "search behavior, no backward movement (no rear-facing camera) — "
         "does nothing when no goose is in frame."
     )
-    parser.add_argument("--port", default="/dev/ttyUSB0", help="Arduino serial port")
+    parser.add_argument("--port", default="/dev/ttyUSB0", help="Arduino serial port (ignored if --relay-host is set)")
     parser.add_argument("--baud", type=int, default=9600)
+    parser.add_argument(
+        "--relay-host",
+        default=None,
+        help="If set, send drive commands over HTTP to a motor_server.py "
+        "running at this host (e.g. the Pi's IP) instead of a local serial "
+        "port. Use this when detection runs on a different machine than the "
+        "one wired to the Arduino.",
+    )
+    parser.add_argument("--relay-port", type=int, default=5005, help="Port for --relay-host")
     parser.add_argument("--camera", type=int, default=0, help="Camera index (opencv backend)")
     parser.add_argument(
         "--backend",
@@ -53,7 +62,10 @@ def main() -> None:
     args = parser.parse_args()
 
     detector = LiveDetector(camera_index=args.camera, interval=args.interval, backend=args.backend)
-    car = CarController(port=args.port, baud=args.baud)
+    if args.relay_host:
+        car = RemoteCarController(host=args.relay_host, port=args.relay_port)
+    else:
+        car = CarController(port=args.port, baud=args.baud)
 
     detector.start()
     try:
