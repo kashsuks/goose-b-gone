@@ -6,7 +6,7 @@ import sys
 from inference_sdk import InferenceHTTPClient, InferenceConfiguration
 
 MODEL_ID = "canadian-geese-detector-5frcl/1"
-API_URL = "https://serverless.roboflow.com"
+DEFAULT_API_URL = "https://serverless.roboflow.com"
 
 
 def get_client() -> InferenceHTTPClient:
@@ -14,7 +14,8 @@ def get_client() -> InferenceHTTPClient:
     if not api_key:
         sys.exit("ROBOFLOW_API_KEY environment variable is not set")
 
-    client = InferenceHTTPClient(api_url=API_URL, api_key=api_key)
+    api_url = os.environ.get("ROBOFLOW_API_URL", DEFAULT_API_URL)
+    client = InferenceHTTPClient(api_url=api_url, api_key=api_key)
     client.configure(InferenceConfiguration(api_key_transport="header"))
     return client
 
