@@ -46,7 +46,7 @@ def main() -> None:
     parser.add_argument(
         "--interval", type=float, default=1.0, help="Seconds between cloud detection calls"
     )
-    parser.add_argument("--max-speed", type=int, default=150, help="Forward drive speed (0-255)")
+    parser.add_argument("--max-speed", type=int, default=50, help="Forward drive speed (0-255)")
     parser.add_argument(
         "--close-threshold",
         type=float,
