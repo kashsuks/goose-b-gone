@@ -72,6 +72,7 @@ def main() -> None:
                 # No goose in frame: do nothing. The Arduino's own watchdog
                 # (goose_chaser.ino) auto-stops the motors if no command
                 # arrives for 800ms, so simply not sending anything is safe.
+                print("No goose detected")
                 continue
 
             direction, speed = compute_command(target, frame_width, args.close_threshold, args.max_speed)
