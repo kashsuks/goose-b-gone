@@ -81,7 +81,8 @@ def main() -> None:
         while True:
             ok, frame = detector.read_frame()
             if not ok:
-                print("Failed to read frame from camera")
+                print("Failed to read frame from camera, retrying in 1s...")
+                time.sleep(1)
                 continue
 
             frame_width = frame.shape[1]

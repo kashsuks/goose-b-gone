@@ -58,6 +58,8 @@ class RpicamCapture:
                 capture_output=True,
             )
             if proc.returncode != 0:
+                stderr = proc.stderr.decode(errors="replace").strip()
+                print(f"rpicam-still failed (exit {proc.returncode}): {stderr}")
                 return False, None
             frame = cv2.imread(tmp.name)
             return frame is not None, frame
