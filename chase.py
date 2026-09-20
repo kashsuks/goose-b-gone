@@ -66,7 +66,7 @@ def main() -> None:
     parser.add_argument(
         "--min-confidence",
         type=float,
-        default=0.9,
+        default=0.8,
         help="Minimum detection confidence (0-1) for a box to be considered a goose",
     )
     args = parser.parse_args()

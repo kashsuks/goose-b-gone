@@ -82,8 +82,9 @@ class LiveDetector:
     stays as smooth as the capture backend allows even though inference
     happens over the network."""
 
-    def __init__(self, camera_index: int, interval: float, backend: str):
-        self.client = get_client()
+    def __init__(self, camera_index: int, interval: float, backend: str, detect: bool = True):
+        self.detect_enabled = detect
+        self.client = get_client() if detect else None
         self.interval = interval
         self.capture = open_capture(camera_index, backend)
 
@@ -95,11 +96,13 @@ class LiveDetector:
         self._worker = threading.Thread(target=self._detect_loop, daemon=True)
 
     def start(self) -> None:
-        self._worker.start()
+        if self.detect_enabled:
+            self._worker.start()
 
     def stop(self) -> None:
         self._running = False
-        self._worker.join(timeout=self.interval + 1)
+        if self.detect_enabled:
+            self._worker.join(timeout=self.interval + 1)
         self.capture.release()
 
     def read_frame(self):
@@ -222,9 +225,20 @@ def main() -> None:
     )
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind for --stream")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind for --stream")
+    parser.add_argument(
+        "--no-detect",
+        action="store_true",
+        help="Show the raw camera feed only, without running detection "
+        "(no Roboflow calls, no API key needed)",
+    )
     args = parser.parse_args()
 
-    detector = LiveDetector(camera_index=args.camera, interval=args.interval, backend=args.backend)
+    detector = LiveDetector(
+        camera_index=args.camera,
+        interval=args.interval,
+        backend=args.backend,
+        detect=not args.no_detect,
+    )
     detector.start()
     try:
         if args.stream:
