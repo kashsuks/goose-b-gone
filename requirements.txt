@@ -1,3 +1,4 @@
 inference-sdk
 opencv-python
 flask
+pyserial
